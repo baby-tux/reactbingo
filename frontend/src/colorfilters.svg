@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" height="0" width="0">
+<defs>
+  <filter id="colorChangeRed">
+    <feColorMatrix
+      type = "matrix"
+      values="1     0     0     0     0
+              0     0     0     0     0
+              0     0     0     0     0
+              0     0     0     1     0 "/>
+  </filter>
+  <filter id="colorChangeGreen">
+    <feColorMatrix
+      type = "matrix"
+      values="0     0     0     0     0
+              0     1     0     0     0
+              0     0     0     0     0
+              0     0     0     1     0 "/>
+  </filter>
+  <filter id="colorChangeYellow">
+    <feColorMatrix
+      type = "matrix"
+      values="1     0     0     0     0
+              0     1     0     0     0
+              0     0     0     0     0
+              0     0     0     1     0 "/>
+  </filter>
+</defs>
+</svg>
