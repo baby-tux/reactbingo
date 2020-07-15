@@ -38,7 +38,7 @@ app.get('/types', async (req, res) => {
 });
 
 app.post('/validate', async (req, res) => {
-  return res.status(200).json(validator.validate(parseInt(req.body.cardNumber), req.body.numbers, req.body.completedPatterns));
+  return res.status(200).json(validator.validate(parseInt(req.body.cardNumber), req.body.numbers, req.body.patterns));
 });
 
 wss.on('connection', (ws: WebSocket) => {

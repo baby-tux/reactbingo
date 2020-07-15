@@ -30,7 +30,7 @@ class Validation {
     });
   }
 
-  validate(id: Number, drawnNumbers: Array<any>, completedPatterns: Array<string>) {
+  validate(id: Number, drawnNumbers: Array<any>, patterns: Array<string>) {
     let index = this.data.findIndex(c => c.id === id);
     if (index === -1) {
       return {isValid: false};
@@ -56,9 +56,7 @@ class Validation {
 
     cardResult['n3'] = {number: '*', isOnPattern: false, isDraw: false};
 
-    let validations = Object.keys(bingoTypeValidations).filter(v => !completedPatterns.includes(v));
-
-    validations.map(type => {
+    patterns.map(type => {
       let patterns: string[][] = (bingoTypeValidations as any)[type];
       let isFound = false;
       patterns.map(pattern => {

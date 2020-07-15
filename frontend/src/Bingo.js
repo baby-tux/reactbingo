@@ -198,13 +198,11 @@ class Bingo extends Component {
     this.state = {
       eventHistory: [],
       eventPosition: 0,
-      currentPatterns: [],
       bingo: false,
-      availableTypes: [],
+      availablePatterns: [],
       viewMode: false,
       validationResult: null,
       validatedPatterns: [],
-      undoneCurrentPatterns: []
     }
   }
 
@@ -212,18 +210,16 @@ class Bingo extends Component {
       this.setState({
         eventHistory: findresponse.eventHistory,
         eventPosition: findresponse.eventPosition,
-        currentPatterns: findresponse.currentPatterns,
         bingo: findresponse.bingo,
         validationResult: findresponse.validationResult,
         validatedPatterns: findresponse.validatedPatterns,
-        undoneCurrentPatterns: findresponse.undoneCurrentPatterns
       })
   }
 
   componentDidMount() {
     api.get("types").then((findresponse) => {
       this.setState({
-        availableTypes: findresponse.data,
+        availablePatterns: findresponse.data,
       })
     })
 
@@ -242,11 +238,9 @@ class Bingo extends Component {
     let bingoState = JSON.stringify({
       eventHistory: this.state.eventHistory,
       eventPosition: this.state.eventPosition,
-      currentPatterns: this.state.currentPatterns,
       bingo: this.state.bingo,
       validationResult: this.state.validationResult,
       validatedPatterns: this.state.validatedPatterns,
-      undoneCurrentPatterns: this.state.undoneCurrentPatterns
     });
 
     client.send(bingoState);
@@ -261,44 +255,24 @@ class Bingo extends Component {
     }
 
     const events = this.state.eventHistory.slice(0, this.state.eventPosition).concat({number: i, patterns: []});
-    if (this.state.eventPosition > 0) events[this.state.eventPosition-1].patterns = this.state.currentPatterns;
 
     this.setState({
       eventHistory: events,
-      eventPosition: this.state.eventPosition+1,
-      currentPatterns: []
+      eventPosition: this.state.eventPosition+1
     }, () => { this.pushState(); });
   }
 
   undo() {
-    if (this.state.currentPatterns.length > 0)
-    {
-      this.setState({currentPatterns: [], undoneCurrentPatterns: this.state.currentPatterns}, () => { this.pushState(); });
-      return;
-    }
-
-    var newEventPosition = this.state.eventPosition-1;
-    var newCurrentPatterns = newEventPosition > 0 ? this.state.eventHistory[newEventPosition-1].patterns : [];
+    let newEventPosition = this.state.eventPosition-1;
     this.setState({
       eventPosition: newEventPosition,
-      currentPatterns: newCurrentPatterns,
-      undoneCurrentPatterns : []
     }, () => { this.pushState(); });
   }
 
   redo() {
-    if (this.state.undoneCurrentPatterns.length > 0)
-    {
-      this.setState({currentPatterns: this.state.undoneCurrentPatterns, undoneCurrentPatterns: []}, () => { this.pushState(); });
-      return;
-    }
-
-    var newEventPosition = this.state.eventPosition+1;
-    var newUndoneCurrentPatterns = this.state.eventHistory[newEventPosition-1].patterns;
+    let newEventPosition = this.state.eventPosition+1;
     this.setState({
-      eventPosition: newEventPosition,
-      currentPatterns: [],
-      undoneCurrentPatterns: newUndoneCurrentPatterns
+      eventPosition: newEventPosition
     }, () => { this.pushState(); });
   }
 
@@ -308,11 +282,9 @@ class Bingo extends Component {
     this.setState({
       eventHistory: [],
       eventPosition: 0,
-      currentPatterns: [],
       bingo: false,
       validationResult: null,
       validatedPatterns: [],
-      undoneCurrentPatterns: []
     }, () => { this.pushState(); });
   }
 
@@ -325,26 +297,32 @@ class Bingo extends Component {
   }
 
   setPatterns(t, keepBingoMode) {
-    const patternsConcat = this.state.currentPatterns.concat(t);
-    const patterns = patternsConcat.filter(function (item, pos) {return patternsConcat.indexOf(item) === pos});
-    const events = this.state.eventHistory.slice(0, this.state.eventPosition);
+    const events = [...this.state.eventHistory.slice(0, this.state.eventPosition), {number: null, patterns: t}];
+    let newEventPosition = this.state.eventPosition+1;
 
     this.setState({
       eventHistory: events,
+      eventPosition: newEventPosition,
       bingo: keepBingoMode,
-      currentPatterns: patterns,
       validationResult: null,
       validatedPatterns: [],
-      undoneCurrentPatterns: []
     }, () => { this.pushState(); });
   }
 
   getNumbers() {
-    return this.state.eventHistory.slice(0, this.state.eventPosition).map((v) => v.number);
+    return this.state.eventHistory.slice(0, this.state.eventPosition).filter((v) => v.number !== null).map((v) => v.number);
   }
 
-  getValidatedTypes() {
-    return this.state.eventPosition === 0 ? [] : this.state.eventHistory.slice(0, this.state.eventPosition-1).map((v) => v.patterns).flatten();
+  getLastNumberIndex() {
+    return this.state.eventHistory.slice(0, this.state.eventPosition).map(v => v.number !== null).lastIndexOf(true);
+  }
+
+  getValidatedPatterns() {
+    return this.state.eventHistory.slice(0, this.getLastNumberIndex()).map((v) => v.patterns).flatten();
+  }
+
+  getCurrentPatterns() {
+    return this.state.eventHistory.slice(this.getLastNumberIndex(), this.state.eventPosition).map((v) => v.patterns).flatten();
   }
 
   toViewMode() {
@@ -356,7 +334,7 @@ class Bingo extends Component {
   checkCard(n) {
     api.post("validate", {
         numbers: this.getNumbers(),
-        completedPatterns: this.getValidatedTypes(),
+        patterns: this.state.availablePatterns.flatten().filter(p => this.state.validatedPatterns.indexOf(p) === -1),
         cardNumber: n
     }).then((findresponse) => {
       if (!findresponse.data.isValid)
@@ -382,7 +360,7 @@ class Bingo extends Component {
           <div className="buttons" style={this.state.viewMode ? {display: 'none'} : {}}>
             <button onClick={() => this.toViewMode()}>👁 </button>
             <button onClick={() => this.undo()} disabled={this.state.eventPosition <= 0 ? "disabled" : ""}><img alt="Undo" src={undoicon} /></button>
-            <button onClick={() => this.redo()} disabled={this.state.eventPosition >= this.state.eventHistory.length && this.state.undoneCurrentPatterns.length === 0 ? "disabled" : ""}><img alt="Redo" src={redoicon} /></button>
+            <button onClick={() => this.redo()} disabled={this.state.eventPosition >= this.state.eventHistory.length ? "disabled" : ""}><img alt="Redo" src={redoicon} /></button>
             <button onClick={() => this.resetNumbers()}><img alt="Reset" src={reseticon} /></button>
           </div>
         </div>
@@ -392,7 +370,7 @@ class Bingo extends Component {
 	<div className="bingo-status">
           { this.state.bingo && this.state.viewMode && this.state.validationResult === null ?
             <div className="bingo-message">Bingo!</div>
-	  : <BingoTypes types={this.state.availableTypes} onValidate={(t, b) => this.setPatterns(t, b)} enabled={this.state.bingo && !this.state.viewMode} onCancel={() => this.bingo(false)} validatedTypes={this.getValidatedTypes()} currentPatterns={this.state.currentPatterns} highlightedTypes={this.state.validatedPatterns} continueAvailable={this.state.validationResult !== null} />
+	  : <BingoTypes types={this.state.availablePatterns} onValidate={(t, b) => this.setPatterns(t, b)} enabled={this.state.bingo && !this.state.viewMode} onCancel={() => this.bingo(false)} validatedTypes={this.getValidatedPatterns()} currentPatterns={this.getCurrentPatterns()} highlightedTypes={this.state.validatedPatterns} continueAvailable={this.state.validationResult !== null} />
           }
           { !this.state.bingo && !this.state.viewMode ? <div><button onClick={() => this.bingo(true)} disabled={this.state.eventPosition > 0 ? null : "disabled"} className="bingoButton">Bingo</button></div> : "" }
         </div>
