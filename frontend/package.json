@@ -4,7 +4,7 @@
   "author": "Guillaume Villeneuve",
   "license": "GPL-3.0-or-later",
   "dependencies": {
-    "axios": "^0.19.2",
+    "axios": "^0.21.2",
     "react": "^16.14.0",
     "react-dom": "^16.14.0",
     "react-router-dom": "^5.2.0",
