@@ -1,6 +1,7 @@
 import * as express from 'express';
 import * as http from 'http';
 import * as WebSocket from 'ws';
+import * as randtoken from 'rand-token';
 import { AddressInfo } from 'net';
 import db from './db';
 import BingoGame from './bingo-model';
@@ -41,8 +42,33 @@ app.post('/validate', async (req, res) => {
   return res.status(200).json(validator.validate(parseInt(req.body.cardNumber), req.body.numbers, req.body.patterns));
 });
 
-wss.on('connection', (ws: WebSocket) => {
+app.post('/create', async (req, res) => {
+  let code = randtoken.generate(12, "abcdefghijklnmopqrstuvwxyz0123456789");
 
+  let schema = new BingoGame({gameId: req.body.gameId, code: code, isPublic: req.body.isPublic});
+  if (!schema) {
+    return res.status(200).json({ success: false, error: "Schema invalid" });
+  }
+
+  schema.save().then(() => {
+    return res.status(200).json({ success: true, code: code });
+  }).catch((error) => {
+    return res.status(200).json({ success: false, error: error });
+  });
+});
+
+app.get('/list', async (req, res) => {
+  let isoMinLastUpdate = new Date(Date.now()-1000*86400*2).toISOString();
+  BingoGame.find({isPublic: true, updatedAt: {$gte: new Date(isoMinLastUpdate)}}, 'gameId', (err, games) => {
+    if (err) {
+      return res.status(400).json({ games: [], error: err });
+    }
+
+    return res.status(200).json({ games: games.map(g => g.get('gameId')) });
+  }).catch(err => console.error(err));
+});
+
+wss.on('connection', (ws: WebSocket) => {
     //connection is up, let's add a simple simple event
     ws.on('message', (message: string) => {
 
@@ -50,25 +76,29 @@ wss.on('connection', (ws: WebSocket) => {
         //console.log('received: %s', message);
         //ws.send(`Hello, you sent -> ${message}`);
         //send back the message to the other clients
-        let game = JSON.parse(message);
-        game.gameId = 1;
-
-        BingoGame.findOneAndUpdate({gameId: 1}, game, {upsert: true, runValidators: true, useFindAndModify: false}, (err: any, doc: any) => {
-          if (!err) {
-            wss.clients
-                .forEach(client => {
-                    if (client != ws) {
-                        client.send(message);
+        let msgObj = JSON.parse(message);
+        switch (msgObj.action) {
+          case "register":
+            (ws as any).gameId = msgObj.gameId;
+            //send current game state
+            getCurrentState(msgObj.gameId).then(s => ws.send(JSON.stringify(s)));
+            break;
+          case "push":
+            BingoGame.findOneAndUpdate({gameId: msgObj.gameId, code: msgObj.code}, msgObj.state, {upsert: false, runValidators: true, useFindAndModify: false}, (err: any, doc: any) => {
+              if (!err) {
+                wss.clients
+                  .forEach(client => {
+                    if (client != ws && client.readyState === WebSocket.OPEN && (client as any).gameId == msgObj.gameId) {
+                      client.send(JSON.stringify(msgObj.state));
                     }
-                });
-          } else {
-            console.log(err)
-          }
-        })
+                  });
+              } else {
+                console.error(err);
+              }
+            })
+            break;
+        }
     });
-
-    //send immediatly a feedback to the incoming connection
-    getCurrentState(1).then(s => ws.send(JSON.stringify(s)));
 });
 
 //start our server

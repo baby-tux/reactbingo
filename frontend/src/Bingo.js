@@ -1,20 +1,15 @@
 import React, { Component } from 'react';
 import {w3cwebsocket as W3CWebSocket} from 'websocket';
-import axios from 'axios'
 import undoicon from './undo.svg';
 import redoicon from './redo.svg';
 import reseticon from './reset.svg';
-
 import patterns from './patterns';
+import api from './api';
 
-
-const api = axios.create({
-    baseURL: '/api/',
-})
 
 //Websocket stuff
-var client = new W3CWebSocket('ws://'+window.location.host+'/api/');
-
+//var client = new W3CWebSocket('ws://'+window.location.host+'/api/');
+var client = new W3CWebSocket('ws://localhost:8999');
 
 // eslint-disable-next-line
 Object.defineProperty(Array.prototype, 'flatten', {
@@ -114,9 +109,9 @@ function ValidationCard(props) {
 
       let number = pos === 'n3' ? '★' : props.result[pos].number;
 
-      numberRow.push(<div className={className}>{number}</div>);
+      numberRow.push(<div className={className} key={pos}>{number}</div>);
     }
-    numbers.push(<div className="cardRow">{numberRow}</div>);
+    numbers.push(<div className="cardRow" key={i}>{numberRow}</div>);
   }
 
   return (
@@ -200,7 +195,6 @@ class Bingo extends Component {
       eventPosition: 0,
       bingo: false,
       availablePatterns: [],
-      viewMode: false,
       validationResult: null,
       validatedPatterns: [],
     }
@@ -217,37 +211,49 @@ class Bingo extends Component {
   }
 
   componentDidMount() {
-    api.get("types").then((findresponse) => {
+    api.getPatterns().then((findresponse) => {
       this.setState({
         availablePatterns: findresponse.data,
       })
     })
 
     client.onmessage = (bingoState) => {
-      if (bingoState.data !== null) {
+      if (bingoState.data !== "null") {
         this.updateState(JSON.parse(bingoState.data));
+      } else {
+        alert('Game not found!');
+        this.props.onError();
       }
     };
 
     client.onopen = (state) => {
       console.log('WebSocket Client Connected');
+      client.send(JSON.stringify({
+        action: "register",
+        gameId: this.props.id
+      }));
     };
   }
 
   pushState() {
     let bingoState = JSON.stringify({
-      eventHistory: this.state.eventHistory,
-      eventPosition: this.state.eventPosition,
-      bingo: this.state.bingo,
-      validationResult: this.state.validationResult,
-      validatedPatterns: this.state.validatedPatterns,
+      action: "push",
+      gameId: this.props.id,
+      code: this.props.code,
+      state: {
+        eventHistory: this.state.eventHistory,
+        eventPosition: this.state.eventPosition,
+        bingo: this.state.bingo,
+        validationResult: this.state.validationResult,
+        validatedPatterns: this.state.validatedPatterns,
+      }
     });
 
     client.send(bingoState);
   }
 
   handleNumberClick(i) {
-    if (this.state.viewMode) return;
+    if (this.isViewMode()) return;
     if (this.state.bingo)
     {
       alert('In bingo mode');
@@ -263,6 +269,12 @@ class Bingo extends Component {
   }
 
   undo() {
+    if (this.state.bingo)
+    {
+      alert('In bingo mode');
+      return;
+    }
+
     let newEventPosition = this.state.eventPosition-1;
     this.setState({
       eventPosition: newEventPosition,
@@ -270,6 +282,12 @@ class Bingo extends Component {
   }
 
   redo() {
+    if (this.state.bingo)
+    {
+      alert('In bingo mode');
+      return;
+    }
+
     let newEventPosition = this.state.eventPosition+1;
     this.setState({
       eventPosition: newEventPosition
@@ -325,16 +343,10 @@ class Bingo extends Component {
     return this.state.eventHistory.slice(this.getLastNumberIndex(), this.state.eventPosition).map((v) => v.patterns).flatten();
   }
 
-  toViewMode() {
-    this.setState({
-      viewMode: true
-    });
-  }
-
   checkCard(n) {
-    api.post("validate", {
+    api.validateCard({
         numbers: this.getNumbers(),
-        patterns: this.state.availablePatterns.flatten().filter(p => this.state.validatedPatterns.indexOf(p) === -1),
+        patterns: this.state.availablePatterns.flatten().filter(p => this.getValidatedPatterns().indexOf(p) === -1),
         cardNumber: n
     }).then((findresponse) => {
       if (!findresponse.data.isValid)
@@ -351,28 +363,31 @@ class Bingo extends Component {
     });
   }
 
+  isViewMode() {
+    return this.props.code === undefined;
+  }
+
   render() {
     return (
       <div className="Bingo">
-        <Board pickedNumbers={this.getNumbers()} onNumberClick={(i) => this.handleNumberClick(i)} viewMode={this.state.viewMode} />
+        <Board pickedNumbers={this.getNumbers()} onNumberClick={(i) => this.handleNumberClick(i)} viewMode={this.isViewMode()} />
         <div className="info-sections">
           <DisplayLastNumbers numbers={this.getNumbers()} />
-          <div className="buttons" style={this.state.viewMode ? {display: 'none'} : {}}>
-            <button onClick={() => this.toViewMode()}>👁 </button>
+          <div className="buttons" style={this.isViewMode() ? {display: 'none'} : {}}>
             <button onClick={() => this.undo()} disabled={this.state.eventPosition <= 0 ? "disabled" : ""}><img alt="Undo" src={undoicon} /></button>
             <button onClick={() => this.redo()} disabled={this.state.eventPosition >= this.state.eventHistory.length ? "disabled" : ""}><img alt="Redo" src={redoicon} /></button>
             <button onClick={() => this.resetNumbers()}><img alt="Reset" src={reseticon} /></button>
           </div>
         </div>
         <div className="bingo-validation">
-          { this.state.validationResult !== null ? <ValidationCard result={this.state.validationResult} /> : this.state.bingo && !this.state.viewMode ? <CardNumberInput onValidate={(i) => this.checkCard(i)} /> : null }
+          { this.state.validationResult !== null ? <ValidationCard result={this.state.validationResult} /> : this.state.bingo && !this.isViewMode() ? <CardNumberInput onValidate={(i) => this.checkCard(i)} /> : null }
         </div>
 	<div className="bingo-status">
-          { this.state.bingo && this.state.viewMode && this.state.validationResult === null ?
+          { this.state.bingo && this.isViewMode() && this.state.validationResult === null ?
             <div className="bingo-message">Bingo!</div>
-	  : <BingoTypes types={this.state.availablePatterns} onValidate={(t, b) => this.setPatterns(t, b)} enabled={this.state.bingo && !this.state.viewMode} onCancel={() => this.bingo(false)} validatedTypes={this.getValidatedPatterns()} currentPatterns={this.getCurrentPatterns()} highlightedTypes={this.state.validatedPatterns} continueAvailable={this.state.validationResult !== null} />
+	  : <BingoTypes types={this.state.availablePatterns} onValidate={(t, b) => this.setPatterns(t, b)} enabled={this.state.bingo && !this.isViewMode()} onCancel={() => this.bingo(false)} validatedTypes={this.getValidatedPatterns()} currentPatterns={this.getCurrentPatterns()} highlightedTypes={this.state.validatedPatterns} continueAvailable={this.state.validationResult !== null} />
           }
-          { !this.state.bingo && !this.state.viewMode ? <div><button onClick={() => this.bingo(true)} disabled={this.state.eventPosition > 0 ? null : "disabled"} className="bingoButton">Bingo</button></div> : "" }
+          { !this.state.bingo && !this.isViewMode() ? <div><button onClick={() => this.bingo(true)} disabled={this.state.eventPosition > 0 ? null : "disabled"} className="bingoButton">Bingo</button></div> : "" }
         </div>
       </div>
     );
