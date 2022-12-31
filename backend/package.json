@@ -11,7 +11,7 @@
   "dependencies": {
     "@types/mongoose": "^5.7.30",
     "@types/papaparse": "^5.0.4",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "mongoose": "^5.9.22",
     "papaparse": "^5.2.0",
     "rand-token": "^1.0.1",
