@@ -15,7 +15,7 @@
     "mongoose": "^5.9.22",
     "papaparse": "^5.2.0",
     "rand-token": "^1.0.1",
-    "ws": "^7.3.0"
+    "ws": "^7.4.6"
   },
   "repository": {
     "type": "git",
