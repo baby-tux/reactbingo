@@ -8,8 +8,7 @@ import api from './api';
 
 
 //Websocket stuff
-//var client = new W3CWebSocket('ws://'+window.location.host+'/api/');
-var client = new W3CWebSocket('ws://localhost:8999');
+var client = new W3CWebSocket('ws://'+window.location.host+'/api/');
 
 // eslint-disable-next-line
 Object.defineProperty(Array.prototype, 'flatten', {
@@ -180,7 +179,7 @@ class BingoTypes extends Component {
       </div>
       <div className="bingo-types-buttons" style={this.props.enabled ? {} : {display: 'none'}}>
           <button disabled={this.state.selectedTypes.length === 0 && this.props.highlightedTypes.length === 0 ? "disabled" : ""} onClick={() => this.validate(false)}>✔</button>&nbsp;
-          <button onClick={() => this.cancel()}>✖</button>&nbsp;<button className="smalltext" disabled={this.props.continueAvailable ? null : "disabled"} onClick={() => this.validate(true)}>Other bingo</button>
+          <button onClick={() => this.cancel()}>✖</button>&nbsp;<button className="smalltext" disabled={this.props.continueAvailable ? null : "disabled"} onClick={() => this.validate(true)}><img alt="Other bingo" src={reseticon} /></button>
       </div>
      </div>
     );

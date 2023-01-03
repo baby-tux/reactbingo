@@ -296,6 +296,14 @@ body {
   color: #555;
 }
 
+.bingo-types-buttons img {
+  height: 55%;
+}
+
+.bingo-types-buttons button:disabled img {
+  opacity: 0.3;
+}
+
 .bingo-types-buttons .smalltext {
   font-size: 3vh;
 }

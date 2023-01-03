@@ -1,7 +1,7 @@
 import * as mongoose from 'mongoose';
 
 mongoose
-    .connect('mongodb://localhost:27017/bingo', { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true })
+    .connect('mongodb://db:27017/bingo')
     .catch((e: any) => {
         console.error('Connection error', e.message)
     })

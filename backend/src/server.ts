@@ -20,12 +20,10 @@ const wss = new WebSocket.Server({ server });
 const validator = new Validation('cards.csv');
 
 let getCurrentState = async (gameId: Number) =>
-  await BingoGame.findOne({gameId: gameId}, (err: any, game: Document) => {
-    if (!err) {
-      return game;
-    } else {
-      return null;
-    }
+  await BingoGame.findOne({gameId: gameId}).then(game => {
+    return game;
+  }).catch(() => {
+    return null;
   })
 
 app.use(express.json());
@@ -59,13 +57,11 @@ app.post('/create', async (req, res) => {
 
 app.get('/list', async (req, res) => {
   let isoMinLastUpdate = new Date(Date.now()-1000*86400*2).toISOString();
-  BingoGame.find({isPublic: true, updatedAt: {$gte: new Date(isoMinLastUpdate)}}, 'gameId', (err, games) => {
-    if (err) {
-      return res.status(400).json({ games: [], error: err });
-    }
-
+  BingoGame.find({isPublic: true, updatedAt: {$gte: new Date(isoMinLastUpdate)}}, 'gameId').then(games => {
     return res.status(200).json({ games: games.map(g => g.get('gameId')) });
-  }).catch(err => console.error(err));
+  }).catch(err => {
+    return res.status(400).json({ games: [], error: err });
+  })
 });
 
 wss.on('connection', (ws: WebSocket) => {
@@ -93,7 +89,7 @@ wss.on('connection', (ws: WebSocket) => {
                     }
                   });
               } else {
-                console.error(err);
+                console.log(err);
               }
             })
             break;
