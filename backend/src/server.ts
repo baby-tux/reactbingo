@@ -80,18 +80,14 @@ wss.on('connection', (ws: WebSocket) => {
             getCurrentState(msgObj.gameId).then(s => ws.send(JSON.stringify(s)));
             break;
           case "push":
-            BingoGame.findOneAndUpdate({gameId: msgObj.gameId, code: msgObj.code}, msgObj.state, {upsert: false, runValidators: true, useFindAndModify: false}, (err: any, doc: any) => {
-              if (!err) {
+            BingoGame.findOneAndUpdate({gameId: msgObj.gameId, code: msgObj.code}, msgObj.state, {upsert: false, runValidators: true, useFindAndModify: false}).then((doc: any) => {
                 wss.clients
                   .forEach(client => {
                     if (client != ws && client.readyState === WebSocket.OPEN && (client as any).gameId == msgObj.gameId) {
                       client.send(JSON.stringify(msgObj.state));
                     }
                   });
-              } else {
-                console.log(err);
-              }
-            })
+            }).catch(err => console.log(err));
             break;
         }
     });
