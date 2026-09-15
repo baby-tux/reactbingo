@@ -72,12 +72,6 @@ app.get('/types', async (req, res) => {
 ## Installation
 
 ```bash
-# Build frontend
-cd frontend
-npm install
-npm run build
-cd ..
-
 # Build backend and launch
 docker-compose build
 docker-compose up -d
