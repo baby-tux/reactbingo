@@ -31,7 +31,7 @@ docker compose build && docker compose up -d   # http://localhost:3000
 There is no linter config beyond CRA's built-in ESLint, and no backend tests.
 
 Dev caveats:
-- `backend/src/db.ts` hardcodes `mongodb://db:27017/bingo`, so the backend only reaches Mongo inside compose (or with a `db` host alias).
+- `backend/src/db.ts` connects to Mongo at `db:27017` when `NODE_ENV=production` (set in the backend Docker image) and `localhost:27017` otherwise.
 - The frontend calls `/api/...` and nginx strips the `/api` prefix before proxying to the backend (`nginx.conf`). The backend routes have no `/api` prefix, so the CRA `proxy` setting alone does not line up with backend routes. The WebSocket also connects to `ws://<host>/api/` (plain `ws`, not `wss`).
 - `cards.csv` is read relative to the backend's working directory; compose mounts `backend/cards.csv` into `/app`.
 

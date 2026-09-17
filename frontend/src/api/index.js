@@ -1,7 +1,11 @@
 import axios from 'axios'
 
+export const API_URL = process.env.NODE_ENV === 'development'
+    ? 'http://localhost:8999/'
+    : '/api/'
+
 const api = axios.create({
-    baseURL: '/api/',
+    baseURL: API_URL,
 })
 
 export const createGame = payload => api.post(`create`, payload)

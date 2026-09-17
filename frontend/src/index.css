@@ -338,3 +338,175 @@ body {
 .connection-status button {
   margin-left: 1em;
 }
+
+/* Portrait mode: board transposed on the left (letters as column headers),
+   info and controls stacked in a column on the right */
+@media (orientation: portrait) {
+  .Bingo {
+    display: grid;
+    grid-template-columns: 48vw 1fr;
+    column-gap: 4vw;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100vh;
+  }
+
+  .game-board {
+    grid-column: 1;
+    grid-row: 1 / 4;
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100vh;
+    padding: 0.5vh 0.5vw;
+  }
+
+  .board-row {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .board-letter, .board-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    float: none;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .board-letter {
+    font-size: min(4.5vh, 7vw);
+    padding: 0;
+  }
+
+  .board-number,
+  .board-number:disabled {
+    font-size: min(3.5vh, 5vw);
+    padding: 0;
+  }
+
+  /* Outline instead of border: a border would grow the pressed cell and shift the column */
+  .board-number:active {
+    border: none;
+    outline: 0.5vw solid white;
+    outline-offset: -0.5vw;
+    padding: 0;
+  }
+
+  .info-sections, .bingo-validation, .bingo-status {
+    grid-column: 2;
+    float: none;
+    width: 100%;
+  }
+
+  .info-sections {
+    grid-row: 1;
+    padding: 2vh 2vw 0.5vh 0;
+  }
+
+  /* Takes the free space between the last numbers and the patterns, content centered in it */
+  .bingo-validation {
+    grid-row: 2;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* Patterns and bingo buttons sit at the bottom of the column */
+  .bingo-status {
+    grid-row: 3;
+    height: auto;
+    padding: 1vh 2vw 3vh 0;
+  }
+
+  .last-numbers {
+    display: flex;
+    align-items: center;
+    height: auto;
+  }
+
+  .last-numbers:after {
+    display: none;
+  }
+
+  .previous-numbers {
+    flex: none;
+    font-size: 5vw;
+    width: auto;
+    padding-right: 3vw;
+    white-space: nowrap;
+  }
+
+  .current-number {
+    flex: 1;
+    font-size: 11vw;
+    height: auto;
+    padding-top: 0;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .buttons button {
+    font-size: 8vw;
+  }
+
+  .buttons img {
+    max-width: 7vw;
+  }
+
+  .cardCell, .cardHead {
+    font-size: 3.5vw;
+    width: 8vw;
+    height: 4vh;
+    border-width: 0.3vw;
+  }
+
+  .card-number-input .number-display,
+  .card-number-input input,
+  .card-number-input button {
+    font-size: 4vw;
+  }
+
+  .card-number-input input {
+    width: 16vw;
+  }
+
+  .card-number-input button {
+    width: 9vw;
+    border-width: 0.3vw;
+  }
+
+  .bingo-message {
+    font-size: 14vw;
+  }
+
+  .bingo-types {
+    height: auto;
+    padding-bottom: 1vh;
+    margin-bottom: 1vh;
+  }
+
+  .bingoType button {
+    font-size: 5vw;
+  }
+
+  .bingoType button img {
+    max-height: 15vh;
+  }
+
+  .bingo-types-buttons button {
+    font-size: 5vh;
+    height: 7vh;
+    width: 13vw;
+    border-width: 0.3vw;
+  }
+
+  .bingoButton {
+    font-size: 7vw;
+    padding: 1vh 8vw;
+    border-width: 0.3vw;
+  }
+}

@@ -6,8 +6,15 @@ import { AddressInfo } from 'net';
 import db from './db';
 import BingoGame from './bingo-model';
 import Validation from './validation'
+import * as cors from 'cors';
 
 const app = express();
+
+//In production nginx serves the frontend and proxies /api on the same origin, so CORS is only needed
+//when the CRA dev server (another port) calls the backend directly
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') ?? ['http://localhost:3000', 'http://127.0.0.1:3000'] }));
+}
 
 db.on('error', console.error.bind(console, 'MongoDB connection error:'));
 

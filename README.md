@@ -6,7 +6,7 @@ React Bingo is a bingo game display board written with the [React Javascript Lib
 
 It has the following features:
 
-- Controller mode optimized for touchscreen use (landscape display)
+- Controller mode optimized for touchscreen use (landscape and portrait orientation)
 - View mode for displaying on a large TV or projector or share screen on a video conference
 - Automatic card validation
 - Multiple prize/patterns: it is possible to continue the game after a bingo was called if one wants to award one prize per pattern.
@@ -15,8 +15,7 @@ It has the following features:
 
 - A bingo game set (cards, something to pick numbers)
 - Firefox, Chrome or Safari browser, may run on other browsers
-- Docker compose (file version: v3)
-- Node.js (`npm`) in order to build the frontend
+- Docker compose
 
 ## Usage
 
@@ -72,7 +71,7 @@ app.get('/types', async (req, res) => {
 ## Installation
 
 ```bash
-# Build backend and launch
+# Build everything and launch
 docker compose build
 docker compose up -d
 ```
@@ -82,4 +81,3 @@ The server now runs on port 3000 (http://localhost:3000).
 ## TODO / Known issues
 
 - Allow something else to be displayed in the bottom right (image/info) if patterns are not relevent (e.g. fully covered card is the only pattern)
-- Portrait mode

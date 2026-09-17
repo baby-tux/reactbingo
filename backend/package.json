@@ -11,6 +11,7 @@
   "author": "Guillaume Villeneuve",
   "license": "GPL-3.0-or-later",
   "dependencies": {
+    "cors": "^2.8.6",
     "express": "^5.2.1",
     "mongoose": "^9.1.2",
     "papaparse": "^5.5.3",
@@ -22,6 +23,7 @@
     "url": "https://github.com/baby-tux/reactbingo/backend"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^25.0.3",
     "@types/papaparse": "^5.5.2",
