@@ -1,5 +1,4 @@
 import React, { Component } from 'react';
-import {w3cwebsocket as W3CWebSocket} from 'websocket';
 import undoicon from './undo.svg';
 import redoicon from './redo.svg';
 import reseticon from './reset.svg';
@@ -8,7 +7,18 @@ import api from './api';
 
 
 //Websocket stuff
-var client = new W3CWebSocket('ws://'+window.location.host+'/api/');
+const HEARTBEAT_INTERVAL = 25000;
+const HEARTBEAT_TIMEOUT = 10000;
+const MAX_RECONNECT_DELAY = 30000;
+
+function socketUrl() {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${protocol}://${window.location.host}/api/`;
+}
+
+function newPushId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
 
 // eslint-disable-next-line
 Object.defineProperty(Array.prototype, 'flatten', {
@@ -186,6 +196,27 @@ class BingoTypes extends Component {
   }
 }
 
+function ConnectionStatus(props) {
+  let message = null;
+  if (props.syncError === 'unauthorized')
+    message = 'Invalid control code: changes are not saved';
+  else if (props.connection === 'connecting')
+    message = 'Connecting…';
+  else if (props.connection === 'closed')
+    message = props.viewMode ? 'Disconnected, retrying…' : 'Disconnected, retrying… Changes will sync when reconnected';
+  else if (props.syncError)
+    message = 'Last change could not be saved';
+
+  if (message === null) return null;
+
+  return (
+    <div className="connection-status">
+      {message}
+      {props.connection === 'closed' ? <button onClick={props.onReconnect}>Reconnect</button> : null}
+    </div>
+  );
+}
+
 class Bingo extends Component {
   constructor(props) {
     super(props);
@@ -196,7 +227,21 @@ class Bingo extends Component {
       availablePatterns: [],
       validationResult: null,
       validatedPatterns: [],
+      connection: 'connecting',
+      syncError: null,
     }
+
+    this.ws = null;
+    this.retries = 0;
+    this.reconnectTimer = null;
+    this.heartbeatTimer = null;
+    this.pongTimer = null;
+    this.hasLoaded = false;   // received the game state at least once
+    this.registered = false;  // current socket received the game state
+    this.revision = 0;        // server revision the local state is based on
+    this.dirty = false;       // local changes not yet sent
+    this.pendingPush = null;  // {pushId, lost} of the push awaiting ack
+    this.blocked = false;     // server rejected the control code
   }
 
   updateState(findresponse) {
@@ -216,29 +261,194 @@ class Bingo extends Component {
       })
     })
 
-    client.onmessage = (bingoState) => {
-      if (bingoState.data !== "null") {
-        this.updateState(JSON.parse(bingoState.data));
-      } else {
+    this.unmounted = false;
+    document.addEventListener('visibilitychange', this.handleWake);
+    window.addEventListener('online', this.handleWake);
+    this.connect();
+  }
+
+  componentWillUnmount() {
+    this.unmounted = true;
+    document.removeEventListener('visibilitychange', this.handleWake);
+    window.removeEventListener('online', this.handleWake);
+    this.teardownSocket();
+  }
+
+  connect() {
+    clearTimeout(this.reconnectTimer);
+    const ws = new WebSocket(socketUrl());
+    this.ws = ws;
+    this.setState({ connection: 'connecting' });
+
+    ws.onopen = () => {
+      this.retries = 0;
+      this.setState({ connection: 'open' });
+      this.send({ action: 'register', gameId: this.props.id });
+      this.heartbeatTimer = setInterval(() => this.checkAlive(), HEARTBEAT_INTERVAL);
+    };
+    ws.onmessage = (event) => this.handleMessage(event.data);
+    ws.onerror = () => ws.close();
+    ws.onclose = () => this.handleDisconnect();
+  }
+
+  teardownSocket() {
+    clearTimeout(this.reconnectTimer);
+    clearInterval(this.heartbeatTimer);
+    clearTimeout(this.pongTimer);
+    this.pongTimer = null;
+    this.registered = false;
+    // We can't know whether an unacknowledged push reached the server; the next state received tells
+    if (this.pendingPush) this.pendingPush.lost = true;
+
+    if (this.ws) {
+      this.ws.onopen = this.ws.onmessage = this.ws.onerror = this.ws.onclose = null;
+      this.ws.close();
+      this.ws = null;
+    }
+  }
+
+  handleDisconnect() {
+    this.teardownSocket();
+    if (this.unmounted) return;
+
+    this.setState({ connection: 'closed' });
+    const delay = Math.min(MAX_RECONNECT_DELAY, 1000 * 2 ** this.retries++) + Math.random() * 500;
+    this.reconnectTimer = setTimeout(() => this.connect(), delay);
+  }
+
+  reconnectNow() {
+    this.retries = 0;
+    this.teardownSocket();
+    this.connect();
+  }
+
+  handleWake = () => {
+    if (document.visibilityState !== 'visible') return;
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) this.checkAlive();
+    else if (this.ws === null || this.ws.readyState !== WebSocket.CONNECTING) this.reconnectNow();
+  }
+
+  // Browsers don't expose protocol pings, so detect half-open connections with an app-level ping
+  checkAlive() {
+    if (this.pongTimer || !this.send({ action: 'ping' })) return;
+    this.pongTimer = setTimeout(() => this.handleDisconnect(), HEARTBEAT_TIMEOUT);
+  }
+
+  send(msg) {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return false;
+    this.ws.send(JSON.stringify(msg));
+    return true;
+  }
+
+  handleMessage(data) {
+    // Any message proves the connection is alive
+    clearTimeout(this.pongTimer);
+    this.pongTimer = null;
+
+    let msg;
+    try {
+      msg = JSON.parse(data);
+    } catch (e) {
+      console.error('Invalid message from server', data);
+      return;
+    }
+
+    const isPendingPush = this.pendingPush !== null && this.pendingPush.pushId === msg.pushId;
+    switch (msg.type) {
+      case 'state':
+        this.receiveState(msg.state);
+        break;
+      case 'ack':
+        if (!isPendingPush) break;
+        this.pendingPush = null;
+        this.revision = msg.revision;
+        if (this.state.syncError) this.setState({ syncError: null });
+        this.flush();
+        break;
+      case 'conflict':
+        if (!isPendingPush) break;
+        this.pendingPush = null;
+        this.dirty = true;
+        this.reconcile(msg.state);
+        break;
+      case 'notFound':
         alert('Game not found!');
         this.props.onError();
-      }
-    };
+        break;
+      case 'error':
+        console.error('Server error:', msg.error);
+        if (isPendingPush) {
+          this.pendingPush = null;
+          this.dirty = true;
+        }
+        if (msg.error === 'unauthorized') {
+          this.blocked = true;
+          this.dirty = false;
+        }
+        this.setState({ syncError: msg.error });
+        break;
+      case 'pong':
+        break;
+      default:
+        console.warn('Unknown message from server', msg);
+    }
+  }
 
-    client.onopen = (state) => {
-      console.log('WebSocket Client Connected');
-      client.send(JSON.stringify({
-        action: "register",
-        gameId: this.props.id
-      }));
-    };
+  receiveState(doc) {
+    this.registered = true;
+
+    if (this.pendingPush) {
+      if (doc.lastPushId === this.pendingPush.pushId) {
+        // Our push was saved before the connection dropped
+        this.pendingPush = null;
+        this.revision = doc.revision;
+        this.flush();
+        return;
+      }
+      // A broadcast raced our push: the ack or conflict for it will follow
+      if (!this.pendingPush.lost) return;
+      // The lost push never reached the server
+      this.pendingPush = null;
+      this.dirty = true;
+    }
+
+    this.reconcile(doc);
+  }
+
+  reconcile(doc) {
+    if (!this.hasLoaded) {
+      this.hasLoaded = true;
+      this.dirty = false;
+    }
+
+    if (this.dirty && doc.revision !== this.revision && !window.confirm(
+      "This game was changed from somewhere else before your latest changes were saved.\n\n" +
+      "OK: overwrite it with your version\nCancel: discard your changes and load the other version")) {
+      this.dirty = false;
+    }
+
+    this.revision = doc.revision;
+    if (this.dirty) this.flush();
+    else this.updateState(doc);
   }
 
   pushState() {
-    let bingoState = JSON.stringify({
-      action: "push",
+    if (this.isViewMode() || this.blocked) return;
+    this.dirty = true;
+    this.flush();
+  }
+
+  // Sends local state if there are unsent changes and no push is awaiting acknowledgement
+  flush() {
+    if (this.isViewMode() || this.blocked || !this.dirty || this.pendingPush || !this.registered) return;
+
+    const pushId = newPushId();
+    const sent = this.send({
+      action: 'push',
       gameId: this.props.id,
       code: this.props.code,
+      pushId: pushId,
+      baseRevision: this.revision,
       state: {
         eventHistory: this.state.eventHistory,
         eventPosition: this.state.eventPosition,
@@ -247,8 +457,10 @@ class Bingo extends Component {
         validatedPatterns: this.state.validatedPatterns,
       }
     });
+    if (!sent) return;
 
-    client.send(bingoState);
+    this.pendingPush = { pushId: pushId, lost: false };
+    this.dirty = false;
   }
 
   handleNumberClick(i) {
@@ -369,6 +581,7 @@ class Bingo extends Component {
   render() {
     return (
       <div className="Bingo">
+        <ConnectionStatus connection={this.state.connection} syncError={this.state.syncError} viewMode={this.isViewMode()} onReconnect={() => this.reconnectNow()} />
         <Board pickedNumbers={this.getNumbers()} onNumberClick={(i) => this.handleNumberClick(i)} viewMode={this.isViewMode()} />
         <div className="info-sections">
           <DisplayLastNumbers numbers={this.getNumbers()} />

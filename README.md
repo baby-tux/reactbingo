@@ -73,15 +73,13 @@ app.get('/types', async (req, res) => {
 
 ```bash
 # Build backend and launch
-docker-compose build
-docker-compose up -d
+docker compose build
+docker compose up -d
 ```
 
-The server now runs on port 3000 (http://localhost:3000). If the server is restarted, refresh any open session.
+The server now runs on port 3000 (http://localhost:3000).
 
 ## TODO / Known issues
 
-- No reconnection (automatic or manual) possible for Websockets
-- React Router should be used instead of the view mode button
 - Allow something else to be displayed in the bottom right (image/info) if patterns are not relevent (e.g. fully covered card is the only pattern)
 - Portrait mode

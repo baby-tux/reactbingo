@@ -10,6 +10,10 @@ const BingoGame = new Schema({
   bingo: { type: Boolean, default: false },
   validationResult: { type: Object, default: null },
   validatedPatterns: { type: [String], default: [] },
+  // Incremented on every accepted push; pushes must be based on the current revision
+  revision: { type: Number, default: 0 },
+  // Client-generated id of the last accepted push, lets a reconnecting controller tell whether its in-flight push landed
+  lastPushId: { type: String, default: null },
 }, { timestamps: true });
 
 export default mongoose.model('bingo', BingoGame);

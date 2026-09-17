@@ -19,7 +19,7 @@ const wss = new WebSocket.Server({ server });
 
 const validator = new Validation('cards.csv');
 
-let getCurrentState = async (gameId: Number) =>
+let getCurrentState = async (gameId: string) =>
   await BingoGame.findOne({gameId: gameId}).then(game => {
     return game;
   }).catch(() => {
@@ -64,37 +64,127 @@ app.get('/list', async (req, res) => {
   })
 });
 
-wss.on('connection', (ws: WebSocket) => {
-    //connection is up, let's add a simple simple event
-    ws.on('message', (message: string) => {
+type Client = WebSocket & { gameId?: string, isAlive?: boolean };
 
-        //log the received message and send it back to the client
-        //console.log('received: %s', message);
-        //ws.send(`Hello, you sent -> ${message}`);
-        //send back the message to the other clients
-        let msgObj = JSON.parse(message);
-        switch (msgObj.action) {
-          case "register":
-            (ws as any).gameId = msgObj.gameId;
-            //send current game state
-            getCurrentState(msgObj.gameId).then(s => ws.send(JSON.stringify(s)));
-            break;
-          case "push":
-            BingoGame.findOneAndUpdate({gameId: msgObj.gameId, code: msgObj.code}, msgObj.state, {upsert: false, runValidators: true, useFindAndModify: false}).then((doc: any) => {
-                wss.clients
-                  .forEach(client => {
-                    if (client != ws && client.readyState === WebSocket.OPEN && (client as any).gameId == msgObj.gameId) {
-                      client.send(JSON.stringify(msgObj.state));
-                    }
-                  });
-            }).catch(err => console.log(err));
-            break;
-        }
-    });
+//Fields a controller is allowed to push
+const STATE_FIELDS = ['eventHistory', 'eventPosition', 'bingo', 'validationResult', 'validatedPatterns'];
+
+//State sent to clients (never includes the control code)
+let publicState = (game: any) => ({
+  eventHistory: game.eventHistory,
+  eventPosition: game.eventPosition,
+  bingo: game.bingo,
+  validationResult: game.validationResult,
+  validatedPatterns: game.validatedPatterns,
+  revision: game.revision ?? 0,
+  lastPushId: game.lastPushId ?? null,
 });
+
+let send = (ws: WebSocket, msg: object) => {
+  if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+};
+
+let handleRegister = async (ws: Client, msg: any) => {
+  ws.gameId = String(msg.gameId);
+  const game = await getCurrentState(ws.gameId);
+  if (!game) return send(ws, { type: 'notFound' });
+  send(ws, { type: 'state', state: publicState(game) });
+};
+
+let handlePush = async (ws: Client, msg: any) => {
+  const gameId = String(msg.gameId);
+  const code = String(msg.code);
+  const baseRevision = Number(msg.baseRevision);
+  if (!Number.isInteger(baseRevision) || typeof msg.pushId !== 'string' || typeof msg.state !== 'object' || msg.state === null) {
+    return send(ws, { type: 'error', error: 'badRequest', pushId: msg.pushId });
+  }
+
+  const update: { [key: string]: unknown } = { revision: baseRevision + 1, lastPushId: msg.pushId };
+  for (const field of STATE_FIELDS) {
+    if (field in msg.state) update[field] = msg.state[field];
+  }
+
+  //Games created before revisions existed have no revision field
+  const revisionFilter = baseRevision === 0 ? { $or: [{ revision: 0 }, { revision: { $exists: false } }] } : { revision: baseRevision };
+  const game = await BingoGame.findOneAndUpdate({ gameId, code, ...revisionFilter }, { $set: update }, { runValidators: true, returnDocument: 'after' });
+
+  if (!game) {
+    const current = await getCurrentState(gameId);
+    if (!current) return send(ws, { type: 'notFound' });
+    if (current.get('code') !== code) return send(ws, { type: 'error', error: 'unauthorized', pushId: msg.pushId });
+    //Someone else pushed since this client's base revision
+    return send(ws, { type: 'conflict', pushId: msg.pushId, state: publicState(current) });
+  }
+
+  const state = publicState(game);
+  send(ws, { type: 'ack', pushId: msg.pushId, revision: state.revision });
+
+  const broadcast = JSON.stringify({ type: 'state', state });
+  wss.clients.forEach(client => {
+    if (client !== ws && client.readyState === WebSocket.OPEN && (client as Client).gameId === gameId) {
+      client.send(broadcast);
+    }
+  });
+};
+
+wss.on('connection', (ws: Client) => {
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+
+  ws.on('message', async (data) => {
+    let msg: any;
+    try {
+      msg = JSON.parse(data.toString());
+    } catch {
+      return send(ws, { type: 'error', error: 'badRequest' });
+    }
+
+    try {
+      switch (msg?.action) {
+        case 'register':
+          await handleRegister(ws, msg);
+          break;
+        case 'push':
+          await handlePush(ws, msg);
+          break;
+        case 'ping':
+          send(ws, { type: 'pong' });
+          break;
+        default:
+          send(ws, { type: 'error', error: 'unknownAction' });
+      }
+    } catch (err) {
+      console.error(err);
+      send(ws, { type: 'error', error: 'serverError', pushId: msg?.pushId });
+    }
+  });
+});
+
+//Terminate connections that stopped answering pings (sleeping phones, dropped networks)
+const heartbeat = setInterval(() => {
+  wss.clients.forEach(client => {
+    const ws = client as Client;
+    if (!ws.isAlive) return ws.terminate();
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+
+wss.on('close', () => clearInterval(heartbeat));
 
 //start our server
 server.listen(process.env.PORT || 8999, () => {
     const {port} = server.address() as AddressInfo;
     console.log(`Server started on port ${port} :)`);
 });
+
+//Close sockets on docker stop so clients see the disconnect immediately instead of after the kill timeout
+let shutdown = () => {
+  console.log('Shutting down');
+  wss.clients.forEach(client => client.close(1001, 'Server shutting down'));
+  wss.close();
+  server.close(() => db.close().finally(() => process.exit(0)));
+  setTimeout(() => process.exit(0), 3000).unref();
+};
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

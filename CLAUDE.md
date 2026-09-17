@@ -25,7 +25,7 @@ npm run build        # tsc: type-check / compile to backend/dist
 npm start            # node dist/server.js
 
 # Full stack
-docker-compose build && docker-compose up -d   # http://localhost:3000
+docker compose build && docker compose up -d   # http://localhost:3000
 ```
 
 There is no linter config beyond CRA's built-in ESLint, and no backend tests.
@@ -39,7 +39,7 @@ Dev caveats:
 
 **Game model and URLs.** A game is a Mongo document (`backend/src/bingo-model.ts`) keyed by `gameId` with a random secret `code` generated on `POST /create`. Frontend routes (`frontend/src/App.js`): `/` lists public games updated in the last 2 days and creates games; `/view/:id` is read-only; `/control/:id/:code` is the controller. View vs. control mode is decided solely by whether `code` is present (`Bingo.isViewMode()`). The README's "eye icon" description of view mode is outdated.
 
-**State sync is client-authoritative.** The controller holds the full game state in React state (`frontend/src/Bingo.js`) and after every change sends the entire state over the WebSocket as `{action: "push", gameId, code, state}`. The server writes it with `findOneAndUpdate({gameId, code}, state)` and rebroadcasts it to the other sockets registered to that `gameId`. Clients send `{action: "register", gameId}` on connect and receive the current document (or `"null"` if not found). There is no reconnection logic, and the WebSocket client is a module-level singleton in `Bingo.js`.
+**State sync is client-authoritative.** The controller holds the full game state in React state (`frontend/src/Bingo.js`) and after every change sends the entire state over the WebSocket as `{action: "push", gameId, code, pushId, baseRevision, state}`, one push at a time. Clients send `{action: "register", gameId}` on connect and receive `{type: "state", state}` (or `{type: "notFound"}`); the control code is never sent to clients. Pushes carry the `baseRevision` they were built on; the server applies them only if it matches the stored `revision` (otherwise it replies `conflict`), replies `ack`, and broadcasts `{type: "state"}` to the other sockets registered to that `gameId`. The client in `Bingo.js` reconnects with backoff, pings to detect dead connections, queues changes made while offline, and asks the controller which version wins on conflict.
 
 **Event history.** State is `eventHistory` (array of `{number, patterns}`) plus `eventPosition`, a cursor that supports undo/redo. A drawn number is `{number: n, patterns: []}`. Awarding patterns after a bingo appends `{number: null, patterns: [...]}`. Drawn numbers, already-validated patterns (before the last drawn number), and current patterns (after it) are all derived by slicing the history up to `eventPosition`. `bingo`, `validationResult`, and `validatedPatterns` hold the transient state of an in-progress bingo check.
 

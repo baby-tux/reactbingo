@@ -320,3 +320,21 @@ body {
   border-color: #555;
   color: #555;
 }
+
+.connection-status {
+  position: fixed;
+  top: 1vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 0.5em 1em;
+  background-color: #AA2222AA;
+  border: 0.15vw solid #FFFFFFCC;
+  border-radius: 0.5em;
+  color: white;
+  font-size: 1.2em;
+}
+
+.connection-status button {
+  margin-left: 1em;
+}
