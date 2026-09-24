@@ -9,6 +9,7 @@ node_modules
 # production
 /backend/dist
 /frontend/build
+/frontend/dist
 
 #data
 /db

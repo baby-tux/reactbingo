@@ -12,7 +12,6 @@ const HEARTBEAT_TIMEOUT = 10000;
 const MAX_RECONNECT_DELAY = 30000;
 
 function socketUrl() {
-  if (process.env.NODE_ENV === 'development') return 'ws://localhost:8999/';
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   return `${protocol}://${window.location.host}/api/`;
 }

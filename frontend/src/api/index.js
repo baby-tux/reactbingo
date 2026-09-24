@@ -1,8 +1,6 @@
 import axios from 'axios'
 
-export const API_URL = process.env.NODE_ENV === 'development'
-    ? 'http://localhost:8999/'
-    : '/api/'
+export const API_URL = '/api/'
 
 const api = axios.create({
     baseURL: API_URL,
