@@ -10,7 +10,13 @@ import corners from './corners.svg'
 import x from './x.svg'
 import blackout from './blackout.svg'
 
-const images = [
+export interface PatternImage {
+  name: string;
+  src: string;
+}
+
+// name must match the pattern key in backend/src/validation.ts
+const images: PatternImage[] = [
   { name: "b", src: b },
   { name: "i", src: i },
   { name: "n", src: n },
@@ -23,5 +29,9 @@ const images = [
   { name: "x", src: x },
   { name: "full", src: blackout },
 ];
+
+export function patternImage(name: string): PatternImage | undefined {
+  return images.find((p) => p.name === name);
+}
 
 export default images;
