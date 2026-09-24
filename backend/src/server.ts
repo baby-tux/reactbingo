@@ -33,6 +33,10 @@ let getCurrentState = async (gameId: string) =>
     return null;
   })
 
+//Games not updated for this long are hidden from the list and deleted on the next game creation
+const STALE_GAME_AGE_MS = 1000*86400*2;
+let staleCutoff = () => new Date(Date.now() - STALE_GAME_AGE_MS);
+
 app.use(express.json());
 
 //Edit types here!
@@ -48,6 +52,11 @@ app.post('/validate', async (req, res) => {
 });
 
 app.post('/create', async (req, res) => {
+  //Cleanup failure must not prevent creating the game
+  await BingoGame.deleteMany({updatedAt: {$lt: staleCutoff()}}).catch(err => {
+    console.error('Failed to delete stale games:', err);
+  });
+
   let code = randtoken.generate(12, "abcdefghijklnmopqrstuvwxyz0123456789");
 
   let schema = new BingoGame({gameId: req.body.gameId, code: code, isPublic: req.body.isPublic});
@@ -63,8 +72,7 @@ app.post('/create', async (req, res) => {
 });
 
 app.get('/list', async (req, res) => {
-  let isoMinLastUpdate = new Date(Date.now()-1000*86400*2).toISOString();
-  BingoGame.find({isPublic: true, updatedAt: {$gte: new Date(isoMinLastUpdate)}}, 'gameId').then(games => {
+  BingoGame.find({isPublic: true, updatedAt: {$gte: staleCutoff()}}, 'gameId').then(games => {
     return res.status(200).json({ games: games.map(g => g.get('gameId')) });
   }).catch(err => {
     return res.status(400).json({ games: [], error: err });
