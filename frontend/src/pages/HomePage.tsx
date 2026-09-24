@@ -11,34 +11,43 @@ export default function HomePage() {
   const [newError, setNewError] = useState('');
 
   useEffect(() => {
-    api.getGameList()
+    api
+      .getGameList()
       .then(setGameList)
       .catch(() => setGameList([]));
   }, []);
 
   const createGame = () => {
-    api.createGame({ gameId: newGameId, isPublic: newPublic }).then((resp) => {
-      if (resp.success) {
-        alert('Success! Code is: ' + resp.code);
-        setNewGameId('');
-        setNewPublic(true);
-        setNewError('');
-      } else {
-        setNewError('Could not create game (the name may already be taken)');
-      }
-    }).catch(() => setNewError('Could not reach the server'));
+    api
+      .createGame({ gameId: newGameId, isPublic: newPublic })
+      .then((resp) => {
+        if (resp.success) {
+          alert('Success! Code is: ' + resp.code);
+          setNewGameId('');
+          setNewPublic(true);
+          setNewError('');
+        } else {
+          setNewError('Could not create game (the name may already be taken)');
+        }
+      })
+      .catch(() => setNewError('Could not reach the server'));
   };
 
   let list;
   if (gameList === null) list = <p>Loading...</p>;
   else if (gameList.length === 0) list = <p>No game found</p>;
-  else list = (
-    <ul>
-      {gameList.map((g) => (
-        <li key={g}><a href={`/view/${g}`} target="_blank" rel="noopener noreferrer">{g}</a></li>
-      ))}
-    </ul>
-  );
+  else
+    list = (
+      <ul>
+        {gameList.map((g) => (
+          <li key={g}>
+            <a href={`/view/${g}`} target="_blank" rel="noopener noreferrer">
+              {g}
+            </a>
+          </li>
+        ))}
+      </ul>
+    );
 
   return (
     <>
@@ -47,19 +56,30 @@ export default function HomePage() {
       {list}
       <h2>Create new game</h2>
       <p>
-        Enter name: <input
+        Enter name:{' '}
+        <input
           type="text"
           maxLength={MAX_GAME_ID_LENGTH}
           onChange={(e) => setNewGameId(e.target.value.replace(/\W/g, ''))}
           value={newGameId}
           placeholder="Game ID (alphanumeric, no spaces)"
-        /><br />
+        />
+        <br />
         <br />
         <input type="checkbox" id="isPublic" checked={newPublic} onChange={(e) => setNewPublic(e.target.checked)} />
         <label htmlFor="isPublic">&nbsp;Public game</label>
-        <br /><br />
-        {newError.length > 0 ? <span>Error: {newError}<br /></span> : null}
-        &nbsp;<button disabled={newGameId.length < 1} onClick={createGame}>Create!</button>
+        <br />
+        <br />
+        {newError.length > 0 ? (
+          <span>
+            Error: {newError}
+            <br />
+          </span>
+        ) : null}
+        &nbsp;
+        <button disabled={newGameId.length < 1} onClick={createGame}>
+          Create!
+        </button>
       </p>
     </>
   );

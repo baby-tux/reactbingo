@@ -55,12 +55,12 @@ export class GameSyncClient {
   private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
   private pongTimer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
-  private hasLoaded = false;   // received the game state at least once
-  private registered = false;  // current socket received the game state
-  private revision = 0;        // server revision the local state is based on
-  private dirty = false;       // local changes not yet sent
+  private hasLoaded = false; // received the game state at least once
+  private registered = false; // current socket received the game state
+  private revision = 0; // server revision the local state is based on
+  private dirty = false; // local changes not yet sent
   private pendingPush: { pushId: string; lost: boolean } | null = null; // push awaiting ack
-  private blocked = false;     // server rejected the control code
+  private blocked = false; // server rejected the control code
   private status: SyncStatus = { connection: 'connecting', syncError: null };
 
   constructor(gameId: string, code: string | undefined, callbacks: SyncCallbacks) {
@@ -247,9 +247,14 @@ export class GameSyncClient {
       this.dirty = false;
     }
 
-    if (this.dirty && doc.revision !== this.revision && !window.confirm(
-      "This game was changed from somewhere else before your latest changes were saved.\n\n" +
-      "OK: overwrite it with your version\nCancel: discard your changes and load the other version")) {
+    if (
+      this.dirty &&
+      doc.revision !== this.revision &&
+      !window.confirm(
+        'This game was changed from somewhere else before your latest changes were saved.\n\n' +
+          'OK: overwrite it with your version\nCancel: discard your changes and load the other version',
+      )
+    ) {
       this.dirty = false;
     }
 

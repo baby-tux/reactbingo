@@ -9,14 +9,11 @@ interface ConnectionStatusProps {
 
 export default function ConnectionStatus({ connection, syncError, viewMode, onReconnect }: ConnectionStatusProps) {
   let message: string | null = null;
-  if (syncError === 'unauthorized')
-    message = 'Invalid control code: changes are not saved';
-  else if (connection === 'connecting')
-    message = 'Connecting…';
+  if (syncError === 'unauthorized') message = 'Invalid control code: changes are not saved';
+  else if (connection === 'connecting') message = 'Connecting…';
   else if (connection === 'closed')
     message = viewMode ? 'Disconnected, retrying…' : 'Disconnected, retrying… Changes will sync when reconnected';
-  else if (syncError)
-    message = 'Last change could not be saved';
+  else if (syncError) message = 'Last change could not be saved';
 
   if (message === null) return null;
 

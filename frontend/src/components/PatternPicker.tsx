@@ -82,7 +82,10 @@ export default function PatternPicker(props: PatternPickerProps) {
         ))}
       </div>
       <div className="bingo-types-buttons" style={enabled ? {} : { display: 'none' }}>
-        <button disabled={selected.length === 0 && highlighted.length === 0} onClick={() => award(false)}>✔</button>&nbsp;
+        <button disabled={selected.length === 0 && highlighted.length === 0} onClick={() => award(false)}>
+          ✔
+        </button>
+        &nbsp;
         <button onClick={cancel}>✖</button>&nbsp;
         <button className="smalltext" disabled={!continueAvailable} onClick={() => award(true)}>
           <img alt="Other bingo" src={reseticon} />

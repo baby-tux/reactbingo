@@ -26,7 +26,11 @@ export default function ValidationCard({ result }: { result: ValidationResult })
               if (cell.isOnPattern) className += ' cardCellHighlighted';
               else if (cell.isDrawn) className += ' cardCellSelected';
 
-              return <div className={className} key={pos}>{pos === FREE_CELL ? '★' : cell.number}</div>;
+              return (
+                <div className={className} key={pos}>
+                  {pos === FREE_CELL ? '★' : cell.number}
+                </div>
+              );
             })}
           </div>
         ))}

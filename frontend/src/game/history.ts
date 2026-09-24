@@ -19,7 +19,9 @@ export function drawnNumbers(state: GameState): number[] {
 
 /** Index of the last drawn number among the played events, -1 if none */
 export function lastNumberIndex(state: GameState): number {
-  return playedEvents(state).map((e) => e.number !== null).lastIndexOf(true);
+  return playedEvents(state)
+    .map((e) => e.number !== null)
+    .lastIndexOf(true);
 }
 
 /** Patterns awarded before the last drawn number: they can't be won again */

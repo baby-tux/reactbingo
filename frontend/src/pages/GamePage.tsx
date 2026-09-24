@@ -42,30 +42,40 @@ export default function GamePage() {
       <div className="info-sections">
         <LastNumbers numbers={numbers} />
         <div className="buttons" style={isViewMode ? { display: 'none' } : {}}>
-          <button onClick={game.undo} disabled={state.eventPosition <= 0}><img alt="Undo" src={undoicon} /></button>
-          <button onClick={game.redo} disabled={state.eventPosition >= state.eventHistory.length}><img alt="Redo" src={redoicon} /></button>
-          <button onClick={game.reset}><img alt="Reset" src={reseticon} /></button>
+          <button onClick={game.undo} disabled={state.eventPosition <= 0}>
+            <img alt="Undo" src={undoicon} />
+          </button>
+          <button onClick={game.redo} disabled={state.eventPosition >= state.eventHistory.length}>
+            <img alt="Redo" src={redoicon} />
+          </button>
+          <button onClick={game.reset}>
+            <img alt="Reset" src={reseticon} />
+          </button>
         </div>
       </div>
-      <div className="bingo-validation">
-        {validation}
-      </div>
+      <div className="bingo-validation">{validation}</div>
       <div className="bingo-status">
-        {state.bingo && isViewMode && state.validationResult === null
-          ? <div className="bingo-message">Bingo!</div>
-          : <PatternPicker
-              lines={game.availablePatterns}
-              enabled={state.bingo && !isViewMode}
-              validated={validatedPatterns(state)}
-              highlighted={state.validatedPatterns}
-              current={currentPatterns(state)}
-              continueAvailable={state.validationResult !== null}
-              onAward={game.awardPatterns}
-              onCancel={() => game.setBingo(false)}
-            />}
-        {!state.bingo && !isViewMode
-          ? <div><button onClick={() => game.setBingo(true)} disabled={state.eventPosition <= 0} className="bingoButton">Bingo</button></div>
-          : null}
+        {state.bingo && isViewMode && state.validationResult === null ? (
+          <div className="bingo-message">Bingo!</div>
+        ) : (
+          <PatternPicker
+            lines={game.availablePatterns}
+            enabled={state.bingo && !isViewMode}
+            validated={validatedPatterns(state)}
+            highlighted={state.validatedPatterns}
+            current={currentPatterns(state)}
+            continueAvailable={state.validationResult !== null}
+            onAward={game.awardPatterns}
+            onCancel={() => game.setBingo(false)}
+          />
+        )}
+        {!state.bingo && !isViewMode ? (
+          <div>
+            <button onClick={() => game.setBingo(true)} disabled={state.eventPosition <= 0} className="bingoButton">
+              Bingo
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -29,15 +29,19 @@ export function useGame(gameId: string, code: string | undefined, onNotFound: ()
   const { push } = sync;
 
   useEffect(() => {
-    api.getPatterns()
+    api
+      .getPatterns()
       .then(setAvailablePatterns)
       .catch((e: unknown) => console.error('Could not load patterns', e));
   }, []);
 
-  const apply = useCallback((action: GameAction) => {
-    replaceState(gameReducer(stateRef.current, action));
-    push();
-  }, [replaceState, push]);
+  const apply = useCallback(
+    (action: GameAction) => {
+      replaceState(gameReducer(stateRef.current, action));
+      push();
+    },
+    [replaceState, push],
+  );
 
   // Drawing and undo/redo are blocked while a bingo is being checked
   const whenNotInBingo = (action: GameAction) => {
@@ -49,17 +53,20 @@ export function useGame(gameId: string, code: string | undefined, onNotFound: ()
   };
 
   const checkCard = (cardNumber: string) => {
-    api.validateCard({
-      numbers: drawnNumbers(stateRef.current),
-      patterns: candidatePatterns(availablePatterns, stateRef.current),
-      cardNumber,
-    }).then((response) => {
-      if (!response.isValid) {
-        alert('Invalid card number');
-        return;
-      }
-      apply({ type: 'setValidation', result: response.result, patterns: response.patterns });
-    }).catch(() => alert('Could not validate the card, please retry'));
+    api
+      .validateCard({
+        numbers: drawnNumbers(stateRef.current),
+        patterns: candidatePatterns(availablePatterns, stateRef.current),
+        cardNumber,
+      })
+      .then((response) => {
+        if (!response.isValid) {
+          alert('Invalid card number');
+          return;
+        }
+        apply({ type: 'setValidation', result: response.result, patterns: response.patterns });
+      })
+      .catch(() => alert('Could not validate the card, please retry'));
   };
 
   return {
@@ -78,8 +85,7 @@ export function useGame(gameId: string, code: string | undefined, onNotFound: ()
       if (window.confirm('Reset?')) apply({ type: 'reset' });
     },
     setBingo: (bingo: boolean) => apply({ type: 'setBingo', bingo }),
-    awardPatterns: (patterns: string[], keepBingo: boolean) =>
-      apply({ type: 'awardPatterns', patterns, keepBingo }),
+    awardPatterns: (patterns: string[], keepBingo: boolean) => apply({ type: 'awardPatterns', patterns, keepBingo }),
     checkCard,
   };
 }

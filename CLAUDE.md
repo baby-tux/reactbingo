@@ -18,6 +18,9 @@ Deployed with `docker-compose.yml`: `db` (mongo, data in `./db`), `backend` (por
 cd frontend && npm install
 npm run dev          # Vite dev server on :3000 (`npm start` is an alias)
 npm run build        # tsc type-check, then production bundle in frontend/dist
+npm run lint         # ESLint (typescript-eslint, react-hooks)
+npm test             # Vitest watch mode; `npm test -- --run` once, `npm run coverage` for coverage
+npm run format       # Prettier on src/**/*.{ts,tsx}
 
 # Backend (multi-stage Dockerfile uses these scripts)
 cd backend && npm install
@@ -28,7 +31,9 @@ npm start            # node dist/server.js
 docker compose build && docker compose up -d   # http://localhost:3000
 ```
 
-There is no linter config and there are no tests yet.
+The frontend Docker build runs lint and tests before bundling, so either failing breaks the image. There are no backend tests. TypeScript is pinned to 6.0 because typescript-eslint does not support TypeScript 7 yet.
+
+Frontend tests use `src/test/fakeWebSocket.ts` (install with `vi.stubGlobal('WebSocket', FakeWebSocket)`) to drive the sync protocol; a controller only sends its next push after the previous one is acked, so tests must `ack` between changes.
 
 Dev caveats:
 - `backend/src/db.ts` connects to Mongo at `db:27017` when `NODE_ENV=production` (set in the backend Docker image) and `localhost:27017` otherwise.

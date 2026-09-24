@@ -4,9 +4,7 @@ import type { PatternLines, ValidationResult } from '../game/types';
 export const API_URL = '/api/';
 
 export type CreateGameResponse = { success: true; code: string } | { success: false; error: unknown };
-export type ValidateCardResponse =
-  | { isValid: false }
-  | { isValid: true; patterns: string[]; result: ValidationResult };
+export type ValidateCardResponse = { isValid: false } | { isValid: true; patterns: string[]; result: ValidationResult };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(API_URL + path, init);
