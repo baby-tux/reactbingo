@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as api from '../api/client';
+import { useDialog } from '../dialog/DialogContext';
 
 const MAX_GAME_ID_LENGTH = 32;
 
@@ -9,6 +10,7 @@ export default function HomePage() {
   const [newGameId, setNewGameId] = useState('');
   const [newPublic, setNewPublic] = useState(true);
   const [newError, setNewError] = useState('');
+  const dialog = useDialog();
 
   useEffect(() => {
     api
@@ -22,7 +24,12 @@ export default function HomePage() {
       .createGame({ gameId: newGameId, isPublic: newPublic })
       .then((resp) => {
         if (resp.success) {
-          alert('Success! Code is: ' + resp.code);
+          void dialog.alert(
+            `Control it at ${window.location.origin}/control/${newGameId}/${resp.code}\n\nKeep this code secret: anyone who has it can control the game.`,
+            {
+              title: `Game created, code ${resp.code}`,
+            },
+          );
           setNewGameId('');
           setNewPublic(true);
           setNewError('');

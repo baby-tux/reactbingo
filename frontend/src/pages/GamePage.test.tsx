@@ -1,9 +1,10 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import * as api from '../api/client';
 import { INITIAL_STATE } from '../game/history';
+import DialogProvider from '../dialog/DialogProvider';
 import type { ServerGameState, ValidationResult } from '../game/types';
 import { FakeWebSocket } from '../test/fakeWebSocket';
 import GamePage from './GamePage';
@@ -29,6 +30,7 @@ async function renderAt(path: string, state = serverState()) {
         <Route path="/control/:id/:code" element={<GamePage />} />
       </Routes>
     </MemoryRouter>,
+    { wrapper: DialogProvider },
   );
   const ws = FakeWebSocket.latest();
   act(() => {
@@ -120,7 +122,6 @@ describe('control mode', () => {
   });
 
   test('drawing is blocked while checking a bingo', async () => {
-    const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const ws = await renderAt(
       '/control/game1/secret',
       serverState({
@@ -131,8 +132,41 @@ describe('control mode', () => {
     );
 
     await userEvent.click(screen.getByRole('button', { name: '10' }));
-    expect(alert).toHaveBeenCalledWith('In bingo mode');
+    expect(screen.getByRole('alertdialog', { name: 'Bingo in progress' })).toBeInTheDocument();
     expect(ws.pushes()).toEqual([]);
+  });
+
+  test('reset asks for confirmation first', async () => {
+    const ws = await renderAt(
+      '/control/game1/secret',
+      serverState({ eventHistory: [{ number: 9, patterns: [] }], eventPosition: 1 }),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(ws.pushes()).toEqual([]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    await userEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Reset' }));
+    expect(lastPush(ws).state).toMatchObject({ eventHistory: [], eventPosition: 0 });
+  });
+
+  test('asks which version wins when the game changed elsewhere', async () => {
+    const ws = await renderAt('/control/game1/secret');
+    await userEvent.click(screen.getByRole('button', { name: '7' }));
+    act(() =>
+      ws.receive({
+        type: 'conflict',
+        pushId: lastPush(ws).pushId,
+        state: serverState({ eventHistory: [{ number: 64, patterns: [] }], eventPosition: 1, revision: 5 }),
+      }),
+    );
+
+    const dialog = screen.getByRole('alertdialog', { name: 'Game changed elsewhere' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Load other' }));
+    expect(screen.getByRole('button', { name: '64' })).toHaveClass('board-number-active');
+    expect(screen.getByRole('button', { name: '7' })).toBeEnabled();
   });
 });
 
@@ -163,7 +197,6 @@ describe('view mode', () => {
 });
 
 test('an unknown game goes back to the home page', async () => {
-  const alert = vi.spyOn(window, 'alert').mockImplementation(() => {});
   render(
     <MemoryRouter initialEntries={['/view/nope']}>
       <Routes>
@@ -171,12 +204,15 @@ test('an unknown game goes back to the home page', async () => {
         <Route path="/view/:id" element={<GamePage />} />
       </Routes>
     </MemoryRouter>,
+    { wrapper: DialogProvider },
   );
   const ws = FakeWebSocket.latest();
   act(() => {
     ws.open();
     ws.receive({ type: 'notFound' });
   });
-  expect(alert).toHaveBeenCalledWith('Game not found!');
-  expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument();
+  const dialog = await screen.findByRole('alertdialog', { name: 'Game not found' });
+  expect(dialog).toHaveTextContent('There is no game named "nope".');
+  await userEvent.click(within(dialog).getByRole('button', { name: 'OK' }));
+  expect(screen.getByRole('heading', { name: 'Home' })).toBeInTheDocument();
 });

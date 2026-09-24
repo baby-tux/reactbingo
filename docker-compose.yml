@@ -19,8 +19,6 @@ services:
       - db
     links:
       - db
-    ports:
-      - 8999:8999
 
   frontend:
     build:

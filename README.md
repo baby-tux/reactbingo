@@ -78,6 +78,12 @@ docker compose up -d
 
 The server now runs on port 3000 (http://localhost:3000).
 
+## Development mode
+
+1. Start the database: `docker run -v ./db:/data/db -p 27017:27017 mongo`
+2. Start the backend: `cd backend && npm start`
+3. Start the frontend: `cd frontend && npm run dev`
+
 ## TODO / Known issues
 
 - Allow something else to be displayed in the bottom right (image/info) if patterns are not relevent (e.g. fully covered card is the only pattern)

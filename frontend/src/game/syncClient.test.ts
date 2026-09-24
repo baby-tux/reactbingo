@@ -24,10 +24,12 @@ function setup(code: string | null = 'secret') {
     local = s;
   });
   const onNotFound = vi.fn();
+  const confirmOverwrite = vi.fn(() => Promise.resolve(true));
   const client = new GameSyncClient('game1', code ?? undefined, {
     getState: () => local,
     onRemoteState,
     onNotFound,
+    confirmOverwrite,
     onStatus: (s) => statuses.push(s),
   });
   client.start();
@@ -38,6 +40,7 @@ function setup(code: string | null = 'secret') {
     statuses,
     onRemoteState,
     onNotFound,
+    confirmOverwrite,
     lastStatus: () => statuses.at(-1),
     /** Simulates a local change followed by a push, as useGame does */
     change: (next: GameState) => {
@@ -210,31 +213,61 @@ describe('pushes', () => {
 });
 
 describe('conflicts', () => {
-  function conflicted(confirmAnswer: boolean) {
+  /** Gets a conflict for a local change; the answer is given by calling `answer` */
+  function conflicted() {
     const ctx = setup();
+    let answer: (keepLocal: boolean) => void = () => {};
+    ctx.confirmOverwrite.mockImplementation(() => new Promise((resolve) => (answer = resolve)));
     ctx.connect(ctx.ws);
     ctx.change(withNumbers(5));
     const push = ctx.ws.pushes()[0];
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(confirmAnswer);
     ctx.ws.receive({
       type: 'conflict',
       pushId: push.action === 'push' ? push.pushId : '',
       state: serverState({ ...withNumbers(70), revision: 2 }),
     });
-    return { ...ctx, confirm };
+    return {
+      ...ctx,
+      answer: async (keepLocal: boolean) => {
+        answer(keepLocal);
+        await vi.waitFor(() => {});
+      },
+    };
   }
 
-  test('keeping the local version re-pushes it on top of the new revision', () => {
-    const { ws, confirm, onRemoteState } = conflicted(true);
-    expect(confirm).toHaveBeenCalledOnce();
+  test('keeping the local version re-pushes it on top of the new revision', async () => {
+    const { ws, confirmOverwrite, onRemoteState, answer } = conflicted();
+    expect(confirmOverwrite).toHaveBeenCalledOnce();
+    await answer(true);
     expect(ws.pushes()[1]).toMatchObject({ baseRevision: 2, state: withNumbers(5) });
     expect(onRemoteState).toHaveBeenCalledTimes(1); // only the initial load
   });
 
-  test('discarding the local version loads the server one', () => {
-    const { ws, onRemoteState } = conflicted(false);
+  test('discarding the local version loads the server one', async () => {
+    const { ws, onRemoteState, answer } = conflicted();
+    await answer(false);
     expect(ws.pushes()).toHaveLength(1);
     expect(onRemoteState).toHaveBeenLastCalledWith(withNumbers(70));
+  });
+
+  test('nothing is pushed while waiting for the answer, which applies to the newest server state', async () => {
+    const { ws, change, confirmOverwrite, onRemoteState, answer } = conflicted();
+    change(withNumbers(5, 6));
+    ws.receive({ type: 'state', state: serverState({ ...withNumbers(70, 71), revision: 3 }) });
+    expect(ws.pushes()).toHaveLength(1);
+    expect(confirmOverwrite).toHaveBeenCalledOnce();
+
+    await answer(false);
+    expect(onRemoteState).toHaveBeenLastCalledWith(withNumbers(70, 71));
+  });
+
+  test('keeping the local version after more remote changes pushes on the newest revision', async () => {
+    const { ws, change, answer } = conflicted();
+    change(withNumbers(5, 6));
+    ws.receive({ type: 'state', state: serverState({ ...withNumbers(70, 71), revision: 3 }) });
+
+    await answer(true);
+    expect(ws.pushes()[1]).toMatchObject({ baseRevision: 3, state: withNumbers(5, 6) });
   });
 });
 

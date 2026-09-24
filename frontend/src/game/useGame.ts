@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as api from '../api/client';
+import { useDialog } from '../dialog/DialogContext';
 import { INITIAL_STATE, candidatePatterns, drawnNumbers } from './history';
 import { gameReducer, type GameAction } from './reducer';
 import type { GameState, PatternLines } from './types';
@@ -15,6 +16,7 @@ export function useGame(gameId: string, code: string | undefined, onNotFound: ()
   // Latest state, read synchronously by pushes and chained actions
   const stateRef = useRef(state);
   const isViewMode = code === undefined;
+  const dialog = useDialog();
 
   const replaceState = useCallback((next: GameState) => {
     stateRef.current = next;
@@ -25,6 +27,12 @@ export function useGame(gameId: string, code: string | undefined, onNotFound: ()
     getState: () => stateRef.current,
     onRemoteState: replaceState,
     onNotFound,
+    confirmOverwrite: () =>
+      dialog.confirm(
+        'This game was changed from somewhere else before your latest changes were saved. ' +
+          'Keep your version and overwrite the other one, or discard your changes and load the other version?',
+        { title: 'Game changed elsewhere', confirmLabel: 'Keep mine', cancelLabel: 'Load other' },
+      ),
   });
   const { push } = sync;
 
@@ -46,7 +54,7 @@ export function useGame(gameId: string, code: string | undefined, onNotFound: ()
   // Drawing and undo/redo are blocked while a bingo is being checked
   const whenNotInBingo = (action: GameAction) => {
     if (stateRef.current.bingo) {
-      alert('In bingo mode');
+      void dialog.alert('Finish or cancel the bingo check first.', { title: 'Bingo in progress' });
       return;
     }
     apply(action);
@@ -61,12 +69,12 @@ export function useGame(gameId: string, code: string | undefined, onNotFound: ()
       })
       .then((response) => {
         if (!response.isValid) {
-          alert('Invalid card number');
+          void dialog.alert(`There is no card number ${cardNumber}.`, { title: 'Invalid card number' });
           return;
         }
         apply({ type: 'setValidation', result: response.result, patterns: response.patterns });
       })
-      .catch(() => alert('Could not validate the card, please retry'));
+      .catch(() => dialog.alert('Could not validate the card, please retry.', { title: 'Validation failed' }));
   };
 
   return {
@@ -82,7 +90,14 @@ export function useGame(gameId: string, code: string | undefined, onNotFound: ()
     undo: () => whenNotInBingo({ type: 'undo' }),
     redo: () => whenNotInBingo({ type: 'redo' }),
     reset: () => {
-      if (window.confirm('Reset?')) apply({ type: 'reset' });
+      void dialog
+        .confirm('Clear all drawn numbers and awarded patterns?', {
+          title: 'Reset the game',
+          confirmLabel: 'Reset',
+        })
+        .then((confirmed) => {
+          if (confirmed) apply({ type: 'reset' });
+        });
     },
     setBingo: (bingo: boolean) => apply({ type: 'setBingo', bingo }),
     awardPatterns: (patterns: string[], keepBingo: boolean) => apply({ type: 'awardPatterns', patterns, keepBingo }),

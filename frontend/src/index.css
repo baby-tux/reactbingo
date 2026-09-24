@@ -510,3 +510,88 @@ body {
     border-width: 0.3vw;
   }
 }
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  animation: dialog-fade 150ms ease-out;
+}
+
+.dialog-content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 32rem);
+  padding: 1.5rem;
+  background-color: #111;
+  color: white;
+  border: 2px solid white;
+  border-radius: 0.5rem;
+  box-shadow: 0 0 2rem rgba(255, 0, 0, 0.35);
+  animation: dialog-pop 150ms ease-out;
+}
+
+.dialog-content:focus {
+  outline: none;
+}
+
+.dialog-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+  color: red;
+}
+
+.dialog-message {
+  margin: 0 0 1.5rem;
+  font-size: 1.1rem;
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.dialog-button {
+  min-width: 6rem;
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  background-color: black;
+  color: white;
+  border: 2px solid white;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.dialog-button:hover,
+.dialog-button:focus-visible {
+  background-color: #333;
+  outline: none;
+}
+
+.dialog-button-primary {
+  background-color: red;
+  border-color: red;
+}
+
+.dialog-button-primary:hover,
+.dialog-button-primary:focus-visible {
+  background-color: #c00;
+}
+
+@keyframes dialog-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.96);
+  }
+}

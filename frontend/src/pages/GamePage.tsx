@@ -9,6 +9,7 @@ import ConnectionStatus from '../components/ConnectionStatus';
 import LastNumbers from '../components/LastNumbers';
 import PatternPicker from '../components/PatternPicker';
 import ValidationCard from '../components/ValidationCard';
+import { useDialog } from '../dialog/DialogContext';
 import { currentPatterns, drawnNumbers, validatedPatterns } from '../game/history';
 import { useGame } from '../game/useGame';
 
@@ -16,11 +17,12 @@ import { useGame } from '../game/useGame';
 export default function GamePage() {
   const { id = '', code } = useParams();
   const navigate = useNavigate();
+  const dialog = useDialog();
 
   const onNotFound = useCallback(() => {
-    alert('Game not found!');
     navigate('/', { replace: true });
-  }, [navigate]);
+    void dialog.alert(`There is no game named "${id}".`, { title: 'Game not found' });
+  }, [navigate, dialog, id]);
 
   const game = useGame(id, code, onNotFound);
   const { state, isViewMode } = game;

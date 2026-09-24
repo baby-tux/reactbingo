@@ -18,6 +18,7 @@ export function useGameSync(gameId: string, code: string | undefined, handlers: 
       getState: () => handlersRef.current.getState(),
       onRemoteState: (state) => handlersRef.current.onRemoteState(state),
       onNotFound: () => handlersRef.current.onNotFound(),
+      confirmOverwrite: () => handlersRef.current.confirmOverwrite(),
       onStatus: setStatus,
     });
     clientRef.current = client;

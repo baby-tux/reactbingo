@@ -18,6 +18,11 @@ export interface SyncCallbacks {
   onRemoteState(state: GameState): void;
   onStatus(status: SyncStatus): void;
   onNotFound(): void;
+  /**
+   * The server state changed while local changes were unsaved: resolves to true to overwrite it with
+   * the local version, false to discard the local changes
+   */
+  confirmOverwrite(): Promise<boolean>;
 }
 
 export function socketUrl(): string {
@@ -61,6 +66,7 @@ export class GameSyncClient {
   private dirty = false; // local changes not yet sent
   private pendingPush: { pushId: string; lost: boolean } | null = null; // push awaiting ack
   private blocked = false; // server rejected the control code
+  private conflictDoc: ServerGameState | null = null; // newest server state while the user picks a version
   private status: SyncStatus = { connection: 'connecting', syncError: null };
 
   constructor(gameId: string, code: string | undefined, callbacks: SyncCallbacks) {
@@ -247,17 +253,36 @@ export class GameSyncClient {
       this.dirty = false;
     }
 
-    if (
-      this.dirty &&
-      doc.revision !== this.revision &&
-      !window.confirm(
-        'This game was changed from somewhere else before your latest changes were saved.\n\n' +
-          'OK: overwrite it with your version\nCancel: discard your changes and load the other version',
-      )
-    ) {
-      this.dirty = false;
+    // Already asking: the answer will apply to the newest server state
+    if (this.conflictDoc) {
+      this.conflictDoc = doc;
+      return;
     }
 
+    if (this.dirty && doc.revision !== this.revision) {
+      this.conflictDoc = doc;
+      this.callbacks
+        .confirmOverwrite()
+        .catch((e: unknown) => {
+          console.error('Could not ask which version to keep', e);
+          return false;
+        })
+        .then((keepLocal) => this.resolveConflict(keepLocal));
+      return;
+    }
+
+    this.applyServerState(doc);
+  }
+
+  private resolveConflict(keepLocal: boolean): void {
+    const doc = this.conflictDoc;
+    this.conflictDoc = null;
+    if (this.stopped || !doc) return;
+    if (!keepLocal) this.dirty = false;
+    this.applyServerState(doc);
+  }
+
+  private applyServerState(doc: ServerGameState): void {
     this.revision = doc.revision;
     if (this.dirty) this.flush();
     else this.callbacks.onRemoteState(toGameState(doc));
@@ -265,7 +290,15 @@ export class GameSyncClient {
 
   // Sends local state if there are unsent changes and no push is awaiting acknowledgement
   private flush(): void {
-    if (this.code === undefined || this.blocked || !this.dirty || this.pendingPush || !this.registered) return;
+    if (
+      this.code === undefined ||
+      this.blocked ||
+      !this.dirty ||
+      this.pendingPush ||
+      !this.registered ||
+      this.conflictDoc
+    )
+      return;
 
     const pushId = newPushId();
     const sent = this.send({
