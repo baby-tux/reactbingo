@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Bingo display board for running a live 75-ball bingo game. Two independent packages, no root `package.json`:
 
-- `frontend/` — Vite + React 19, plain JS, mostly class components
+- `frontend/` — Vite + React 19 + TypeScript (strict; `Bingo.jsx` still JS), mostly class components
 - `backend/` — Express 5 + `ws` WebSocket server in TypeScript, MongoDB via Mongoose
 
 Deployed with `docker-compose.yml`: `db` (mongo, data in `./db`), `backend` (port 8999), and `frontend` (Vite build stage, then nginx serving `dist` on port 3000).
@@ -17,7 +17,7 @@ Deployed with `docker-compose.yml`: `db` (mongo, data in `./db`), `backend` (por
 # Frontend
 cd frontend && npm install
 npm run dev          # Vite dev server on :3000 (`npm start` is an alias)
-npm run build        # production bundle in frontend/dist
+npm run build        # tsc type-check, then production bundle in frontend/dist
 
 # Backend (multi-stage Dockerfile uses these scripts)
 cd backend && npm install
@@ -32,7 +32,7 @@ There is no linter config and there are no tests yet.
 
 Dev caveats:
 - `backend/src/db.ts` connects to Mongo at `db:27017` when `NODE_ENV=production` (set in the backend Docker image) and `localhost:27017` otherwise.
-- The frontend always calls `/api/...` (REST and WebSocket, `ws`/`wss` following the page protocol). In production nginx strips the `/api` prefix before proxying to the backend (`nginx.conf`); in dev the Vite proxy in `frontend/vite.config.js` does the same, so run the backend on `localhost:8999`.
+- The frontend always calls `/api/...` (REST and WebSocket, `ws`/`wss` following the page protocol). In production nginx strips the `/api` prefix before proxying to the backend (`nginx.conf`); in dev the Vite proxy in `frontend/vite.config.ts` does the same, so run the backend on `localhost:8999`.
 - `cards.csv` is read relative to the backend's working directory; compose mounts `backend/cards.csv` into `/app`.
 
 ## Architecture

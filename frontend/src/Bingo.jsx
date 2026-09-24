@@ -3,7 +3,7 @@ import undoicon from './undo.svg';
 import redoicon from './redo.svg';
 import reseticon from './reset.svg';
 import patterns from './patterns';
-import api from './api';
+import * as api from './api/client';
 
 
 //Websocket stuff
@@ -255,11 +255,11 @@ class Bingo extends Component {
   }
 
   componentDidMount() {
-    api.getPatterns().then((findresponse) => {
+    api.getPatterns().then((patterns) => {
       this.setState({
-        availablePatterns: findresponse.data,
+        availablePatterns: patterns,
       })
-    })
+    }).catch((e) => console.error('Could not load patterns', e));
 
     this.unmounted = false;
     document.addEventListener('visibilitychange', this.handleWake);
@@ -559,19 +559,19 @@ class Bingo extends Component {
         numbers: this.getNumbers(),
         patterns: this.state.availablePatterns.flatten().filter(p => this.getValidatedPatterns().indexOf(p) === -1),
         cardNumber: n
-    }).then((findresponse) => {
-      if (!findresponse.data.isValid)
+    }).then((response) => {
+      if (!response.isValid)
       {
         alert('Invalid card number');
       }
       else
       {
         this.setState({
-          validationResult: findresponse.data.result,
-          validatedPatterns: findresponse.data.patterns,
+          validationResult: response.result,
+          validatedPatterns: response.patterns,
         }, () => { this.pushState(); });
       }
-    });
+    }).catch(() => alert('Could not validate the card, please retry'));
   }
 
   isViewMode() {
